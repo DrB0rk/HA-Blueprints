@@ -1,0 +1,77 @@
+blueprint:
+  name: Zigbee door sensor - control light on open/close
+  description: >
+    Turn a light on when a Zigbee door/contact sensor opens and turn it off when it closes.
+    Intended for sensors that expose open/close as on/off state changes.
+  domain: automation
+  input:
+    door_sensor:
+      name: Door sensor entity
+      description: The Zigbee door/contact sensor entity
+      selector:
+        entity: {}
+
+    light_target:
+      name: Light target
+      description: One or more lights to control
+      selector:
+        target:
+          entity:
+            domain: light
+
+    transition_on:
+      name: Turn-on transition
+      description: Transition time in seconds when the door opens
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 30
+          mode: slider
+          unit_of_measurement: s
+
+    transition_off:
+      name: Turn-off transition
+      description: Transition time in seconds when the door closes
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 30
+          mode: slider
+          unit_of_measurement: s
+
+mode: restart
+
+triggers:
+  - trigger: state
+    entity_id: !input door_sensor
+    to: "on"
+    id: door_open
+
+  - trigger: state
+    entity_id: !input door_sensor
+    to: "off"
+    id: door_closed
+
+conditions: []
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: door_open
+        sequence:
+          - action: light.turn_on
+            target: !input light_target
+            data:
+              transition: !input transition_on
+
+      - conditions:
+          - condition: trigger
+            id: door_closed
+        sequence:
+          - action: light.turn_off
+            target: !input light_target
+            data:
+              transition: !input transition_off
