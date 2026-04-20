@@ -1,18 +1,15 @@
 blueprint:
-  name: Zigbee door sensor event - light on open, off on close
+  name: ZHA door/contact event to light
   description: >
-    For Zigbee door/contact sensors that fire On/Off style events or update an
-    on_off attribute. Turns a light on when the sensor reports open/on and
-    turns it off when the sensor reports close/off.
+    Turn a light on when a ZHA sensor sends an On event, and off when it sends an Off event.
   domain: automation
 
   input:
-    sensor_event_entity:
-      name: Sensor event entity
-      description: The event entity for the Zigbee door sensor
+    device_ieee:
+      name: Device IEEE address
+      description: IEEE address of the ZHA sensor, for example 00:12:4b:00:xx:xx:xx:xx
       selector:
-        entity:
-          domain: event
+        text: {}
 
     light_target:
       name: Light target
@@ -44,28 +41,26 @@ blueprint:
 mode: restart
 
 triggers:
-  - trigger: state
-    entity_id: !input sensor_event_entity
+  - trigger: event
+    event_type: zha_event
 
-conditions: []
+conditions:
+  - condition: template
+    value_template: >
+      {{ trigger.event.data.device_ieee == !input device_ieee }}
 
 actions:
-  - variables:
-      event_type: "{{ trigger.to_state.attributes.event_type | default('') | lower }}"
-      event_state: "{{ trigger.to_state.state | default('') | lower }}"
-      args: "{{ trigger.to_state.attributes.event_arguments | default({}) }}"
-      attr_name: "{{ args.attribute_name | default('') | lower }}"
-      attr_value: "{{ args.attribute_value | default(none) }}"
-      raw_value: "{{ args.value | default(none) }}"
-
   - choose:
       - conditions:
           - condition: template
             value_template: >
               {{
-                event_type == 'on'
-                or event_state == 'on'
-                or (attr_name == 'on_off' and (attr_value == 1 or raw_value == 1))
+                trigger.event.data.command | default('') | lower == 'on'
+                or (
+                  trigger.event.data.command | default('') | lower == 'attribute_updated'
+                  and trigger.event.data.args.attribute_name | default('') == 'on_off'
+                  and trigger.event.data.args.attribute_value | int == 1
+                )
               }}
         sequence:
           - action: light.turn_on
@@ -77,9 +72,12 @@ actions:
           - condition: template
             value_template: >
               {{
-                event_type == 'off'
-                or event_state == 'off'
-                or (attr_name == 'on_off' and (attr_value == 0 or raw_value == 0))
+                trigger.event.data.command | default('') | lower == 'off'
+                or (
+                  trigger.event.data.command | default('') | lower == 'attribute_updated'
+                  and trigger.event.data.args.attribute_name | default('') == 'on_off'
+                  and trigger.event.data.args.attribute_value | int == 0
+                )
               }}
         sequence:
           - action: light.turn_off
