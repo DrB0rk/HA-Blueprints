@@ -1,19 +1,21 @@
 blueprint:
-  name: Zigbee door sensor - control light on open/close
+  name: Zigbee door sensor event - light on open, off on close
   description: >
-    Turn a light on when a Zigbee door/contact sensor opens and turn it off when it closes.
-    Intended for sensors that expose open/close as on/off state changes.
+    For Zigbee door/contact sensors that fire On/Off style events or update an
+    on_off attribute. Turns a light on when the sensor reports open/on and
+    turns it off when the sensor reports close/off.
   domain: automation
+
   input:
-    door_sensor:
-      name: Door sensor entity
-      description: The Zigbee door/contact sensor entity
+    sensor_event_entity:
+      name: Sensor event entity
+      description: The event entity for the Zigbee door sensor
       selector:
-        entity: {}
+        entity:
+          domain: event
 
     light_target:
       name: Light target
-      description: One or more lights to control
       selector:
         target:
           entity:
@@ -21,7 +23,6 @@ blueprint:
 
     transition_on:
       name: Turn-on transition
-      description: Transition time in seconds when the door opens
       default: 0
       selector:
         number:
@@ -32,7 +33,6 @@ blueprint:
 
     transition_off:
       name: Turn-off transition
-      description: Transition time in seconds when the door closes
       default: 0
       selector:
         number:
@@ -45,22 +45,28 @@ mode: restart
 
 triggers:
   - trigger: state
-    entity_id: !input door_sensor
-    to: "on"
-    id: door_open
-
-  - trigger: state
-    entity_id: !input door_sensor
-    to: "off"
-    id: door_closed
+    entity_id: !input sensor_event_entity
 
 conditions: []
 
 actions:
+  - variables:
+      event_type: "{{ trigger.to_state.attributes.event_type | default('') | lower }}"
+      event_state: "{{ trigger.to_state.state | default('') | lower }}"
+      args: "{{ trigger.to_state.attributes.event_arguments | default({}) }}"
+      attr_name: "{{ args.attribute_name | default('') | lower }}"
+      attr_value: "{{ args.attribute_value | default(none) }}"
+      raw_value: "{{ args.value | default(none) }}"
+
   - choose:
       - conditions:
-          - condition: trigger
-            id: door_open
+          - condition: template
+            value_template: >
+              {{
+                event_type == 'on'
+                or event_state == 'on'
+                or (attr_name == 'on_off' and (attr_value == 1 or raw_value == 1))
+              }}
         sequence:
           - action: light.turn_on
             target: !input light_target
@@ -68,8 +74,13 @@ actions:
               transition: !input transition_on
 
       - conditions:
-          - condition: trigger
-            id: door_closed
+          - condition: template
+            value_template: >
+              {{
+                event_type == 'off'
+                or event_state == 'off'
+                or (attr_name == 'on_off' and (attr_value == 0 or raw_value == 0))
+              }}
         sequence:
           - action: light.turn_off
             target: !input light_target
