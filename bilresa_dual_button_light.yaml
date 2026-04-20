@@ -1,0 +1,143 @@
+blueprint:
+  name: IKEA BILRESA dual button - light control
+  description: >
+    Control a light area using an IKEA BILRESA dual Matter button.
+    Button 1 short press turns on to a configured brightness.
+    Button 1 long press turns on to a higher brightness.
+    Button 2 short press turns off.
+    Button 2 long press turns on to a lower brightness.
+  domain: automation
+  input:
+    button_1_event:
+      name: Button 1 event entity
+      description: Event entity for the upper/left button
+      selector:
+        entity:
+          domain: event
+
+    button_2_event:
+      name: Button 2 event entity
+      description: Event entity for the lower/right button
+      selector:
+        entity:
+          domain: event
+
+    target_area:
+      name: Target area
+      description: Area to control
+      selector:
+        area: {}
+
+    short_on_brightness:
+      name: Short press on brightness
+      description: Brightness percentage for short press on
+      default: 60
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: slider
+          unit_of_measurement: "%"
+
+    long_on_brightness:
+      name: Long press up brightness
+      description: Brightness percentage for long press on
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: slider
+          unit_of_measurement: "%"
+
+    long_down_brightness:
+      name: Long press down brightness
+      description: Brightness percentage for long press down
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: slider
+          unit_of_measurement: "%"
+
+    transition_time:
+      name: Transition time
+      description: Transition time in seconds
+      default: 1
+      selector:
+        number:
+          min: 0
+          max: 30
+          mode: slider
+          unit_of_measurement: s
+
+mode: single
+
+triggers:
+  - trigger: state
+    entity_id: !input button_1_event
+    id: button_1
+
+  - trigger: state
+    entity_id: !input button_2_event
+    id: button_2
+
+conditions: []
+
+actions:
+  - variables:
+      event_type: "{{ trigger.to_state.attributes.event_type | default('') }}"
+      target_area: !input target_area
+      short_on_brightness: !input short_on_brightness
+      long_on_brightness: !input long_on_brightness
+      long_down_brightness: !input long_down_brightness
+      transition_time: !input transition_time
+
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'button_1' and event_type == 'multi_press_1' }}
+        sequence:
+          - action: light.turn_on
+            target:
+              area_id: !input target_area
+            data:
+              brightness_pct: "{{ short_on_brightness }}"
+              transition: "{{ transition_time }}"
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'button_1' and event_type == 'long_press' }}
+        sequence:
+          - action: light.turn_on
+            target:
+              area_id: !input target_area
+            data:
+              brightness_pct: "{{ long_on_brightness }}"
+              transition: "{{ transition_time }}"
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'button_2' and event_type == 'multi_press_1' }}
+        sequence:
+          - action: light.turn_off
+            target:
+              area_id: !input target_area
+            data:
+              transition: "{{ transition_time }}"
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'button_2' and event_type == 'long_press' }}
+        sequence:
+          - action: light.turn_on
+            target:
+              area_id: !input target_area
+            data:
+              brightness_pct: "{{ long_down_brightness }}"
+              transition: "{{ transition_time }}"
