@@ -1,18 +1,26 @@
 blueprint:
-  name: ZHA door/contact event to light
+  name: ZHA door/contact event -> light on open, off on close
   description: >
-    Turn a light on when a ZHA sensor sends an On event, and off when it sends an Off event.
+    Turn a light on when a selected ZHA device sends an On/open event,
+    and turn it off when it sends an Off/close event.
+
+    Intended for ZHA devices that show activity such as:
+    - On event was fired
+    - Off event was fired
+    - Attribute Updated with on_off = 1/0
   domain: automation
 
   input:
-    device_ieee:
-      name: Device IEEE address
-      description: IEEE address of the ZHA sensor, for example 00:12:4b:00:xx:xx:xx:xx
+    zha_device:
+      name: ZHA device
+      description: Select the ZHA door/contact device
       selector:
-        text: {}
+        device:
+          integration: zha
 
     light_target:
       name: Light target
+      description: Light or light group to control
       selector:
         target:
           entity:
@@ -44,10 +52,15 @@ triggers:
   - trigger: event
     event_type: zha_event
 
+variables:
+  selected_device: !input zha_device
+  transition_on: !input transition_on
+  transition_off: !input transition_off
+
 conditions:
   - condition: template
     value_template: >
-      {{ trigger.event.data.device_ieee == !input device_ieee }}
+      {{ trigger.event.data.device_id == selected_device }}
 
 actions:
   - choose:
@@ -58,15 +71,16 @@ actions:
                 trigger.event.data.command | default('') | lower == 'on'
                 or (
                   trigger.event.data.command | default('') | lower == 'attribute_updated'
+                  and trigger.event.data.args is mapping
                   and trigger.event.data.args.attribute_name | default('') == 'on_off'
-                  and trigger.event.data.args.attribute_value | int == 1
+                  and trigger.event.data.args.attribute_value | int(0) == 1
                 )
               }}
         sequence:
           - action: light.turn_on
             target: !input light_target
             data:
-              transition: !input transition_on
+              transition: "{{ transition_on }}"
 
       - conditions:
           - condition: template
@@ -75,12 +89,13 @@ actions:
                 trigger.event.data.command | default('') | lower == 'off'
                 or (
                   trigger.event.data.command | default('') | lower == 'attribute_updated'
+                  and trigger.event.data.args is mapping
                   and trigger.event.data.args.attribute_name | default('') == 'on_off'
-                  and trigger.event.data.args.attribute_value | int == 0
+                  and trigger.event.data.args.attribute_value | int(0) == 0
                 )
               }}
         sequence:
           - action: light.turn_off
             target: !input light_target
             data:
-              transition: !input transition_off
+              transition: "{{ transition_off }}"
