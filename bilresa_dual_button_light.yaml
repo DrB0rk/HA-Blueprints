@@ -1,12 +1,27 @@
 blueprint:
-  name: IKEA BILRESA dual button - light control
+  name: IKEA BILRESA dual button - generic actions
   description: >
-    Control a light area using an IKEA BILRESA dual Matter button.
-    Button 1 short press turns on to a configured brightness.
-    Button 1 long press turns on to a higher brightness.
-    Button 2 short press turns off.
-    Button 2 long press turns on to a lower brightness.
+    Generic automation blueprint for the IKEA BILRESA dual Matter button.
+
+    Supports:
+    - Button 1 single press
+    - Button 1 double press
+    - Button 1 long press
+    - Button 2 single press
+    - Button 2 double press
+    - Button 2 long press
+
+    Default event names:
+    - single press: multi_press_1
+    - double press: multi_press_2
+    - long press: long_press
+
+    The blueprint triggers on any update of the event entities and then
+    evaluates the event_type attribute, so repeated presses with the same
+    event_type still work.
+
   domain: automation
+
   input:
     button_1_event:
       name: Button 1 event entity
@@ -22,55 +37,62 @@ blueprint:
         entity:
           domain: event
 
-    target_area:
-      name: Target area
-      description: Area to control
+    single_press_event:
+      name: Single press event_type
+      description: event_type value for a single press
+      default: multi_press_1
       selector:
-        area: {}
+        text: {}
 
-    short_on_brightness:
-      name: Short press on brightness
-      description: Brightness percentage for short press on
-      default: 60
+    double_press_event:
+      name: Double press event_type
+      description: event_type value for a double press
+      default: multi_press_2
       selector:
-        number:
-          min: 1
-          max: 100
-          mode: slider
-          unit_of_measurement: "%"
+        text: {}
 
-    long_on_brightness:
-      name: Long press up brightness
-      description: Brightness percentage for long press on
-      default: 100
+    long_press_event:
+      name: Long press event_type
+      description: event_type value for a long press
+      default: long_press
       selector:
-        number:
-          min: 1
-          max: 100
-          mode: slider
-          unit_of_measurement: "%"
+        text: {}
 
-    long_down_brightness:
-      name: Long press down brightness
-      description: Brightness percentage for long press down
-      default: 20
+    button_1_single_action:
+      name: Button 1 single press action
+      default: []
       selector:
-        number:
-          min: 1
-          max: 100
-          mode: slider
-          unit_of_measurement: "%"
+        action: {}
 
-    transition_time:
-      name: Transition time
-      description: Transition time in seconds
-      default: 1
+    button_1_double_action:
+      name: Button 1 double press action
+      default: []
       selector:
-        number:
-          min: 0
-          max: 30
-          mode: slider
-          unit_of_measurement: s
+        action: {}
+
+    button_1_long_action:
+      name: Button 1 long press action
+      default: []
+      selector:
+        action: {}
+
+    button_2_single_action:
+      name: Button 2 single press action
+      default: []
+      selector:
+        action: {}
+
+    button_2_double_action:
+      name: Button 2 double press action
+      default: []
+      selector:
+        action: {}
+
+    button_2_long_action:
+      name: Button 2 long press action
+      default: []
+      selector:
+        action: {}
 
 mode: single
 
@@ -88,56 +110,43 @@ conditions: []
 actions:
   - variables:
       event_type: "{{ trigger.to_state.attributes.event_type | default('') }}"
-      target_area: !input target_area
-      short_on_brightness: !input short_on_brightness
-      long_on_brightness: !input long_on_brightness
-      long_down_brightness: !input long_down_brightness
-      transition_time: !input transition_time
+      single_press_event: !input single_press_event
+      double_press_event: !input double_press_event
+      long_press_event: !input long_press_event
 
   - choose:
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger.id == 'button_1' and event_type == 'multi_press_1' }}
-        sequence:
-          - action: light.turn_on
-            target:
-              area_id: !input target_area
-            data:
-              brightness_pct: "{{ short_on_brightness }}"
-              transition: "{{ transition_time }}"
+              {{ trigger.id == 'button_1' and event_type == single_press_event }}
+        sequence: !input button_1_single_action
 
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger.id == 'button_1' and event_type == 'long_press' }}
-        sequence:
-          - action: light.turn_on
-            target:
-              area_id: !input target_area
-            data:
-              brightness_pct: "{{ long_on_brightness }}"
-              transition: "{{ transition_time }}"
+              {{ trigger.id == 'button_1' and event_type == double_press_event }}
+        sequence: !input button_1_double_action
 
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger.id == 'button_2' and event_type == 'multi_press_1' }}
-        sequence:
-          - action: light.turn_off
-            target:
-              area_id: !input target_area
-            data:
-              transition: "{{ transition_time }}"
+              {{ trigger.id == 'button_1' and event_type == long_press_event }}
+        sequence: !input button_1_long_action
 
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger.id == 'button_2' and event_type == 'long_press' }}
-        sequence:
-          - action: light.turn_on
-            target:
-              area_id: !input target_area
-            data:
-              brightness_pct: "{{ long_down_brightness }}"
-              transition: "{{ transition_time }}"
+              {{ trigger.id == 'button_2' and event_type == single_press_event }}
+        sequence: !input button_2_single_action
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'button_2' and event_type == double_press_event }}
+        sequence: !input button_2_double_action
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{ trigger.id == 'button_2' and event_type == long_press_event }}
+        sequence: !input button_2_long_action
